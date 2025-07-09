@@ -18,7 +18,7 @@ Automate 15 daily affiliate deals from multiple platforms to Telegram.
 - GitHub Action posts 1 deal every 30 minutes (8 AM – 4 PM)
 
 ## 🧱 Current Progress:
-✅ API Keys ready  
-⬜ Script integration  
-⬜ GitHub Action YAML  
-⬜ Test post to Telegram  
+✅ API Keys ready
+⬜ Script integration
+⬜ GitHub Action YAML
+⬜ Test post to Telegram
