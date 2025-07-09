@@ -2,7 +2,7 @@ name: 🤖 Auto Deal Poster
 
 on:
   schedule:
-    - cron: '0 * * * *'    # Every hour
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,10 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHANNEL: ${{ secrets.TELEGRAM_CHANNEL }}
       TELEGRAM_PERSONAL_CHAT_ID: ${{ secrets.TELEGRAM_PERSONAL_CHAT_ID }}
       EARNKARO_ID: ${{ secrets.EARNKARO_ID }}
+
     steps:
       - name: 📥 Checkout Repo
         uses: actions/checkout@v3
@@ -23,7 +25,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 📦 Install Python libraries
+      - name: 📦 Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install feedparser requests beautifulsoup4 pillow google-generativeai openai
