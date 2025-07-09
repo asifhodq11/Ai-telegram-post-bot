@@ -82,7 +82,7 @@ def convert_to_earnkaro_link(original_url):
 
 def generate_caption(title, prices, deal_url):
     genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-    model = genai.GenerativeModel("gemini-1.5-pro")
+    model = genai.GenerativeModel("gemini-pro")
     affiliate = convert_to_earnkaro_link(deal_url)
     prompt = f"Write a short catchy caption for this product deal:\nTitle: {title}\nPrices:\n{prices}"
     response = model.generate_content(prompt)
