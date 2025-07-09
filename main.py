@@ -36,6 +36,12 @@ def fetch_desidime_html():
 # ✅ Full Getter with fallback logic
 def fetch_desidime_deal():
     deal = fetch_desidime_rss()
+    if not deal:
+        print("⚠️ DesiDime RSS failed. Trying Reddit backup...")
+        deal = fetch_reddit_backup()
+    if not deal:
+        send_personal_alert("❌ No deals from DesiDime or Reddit RSS 😓")
+        return
     if deal:
         return deal
     print("⚠️ RSS failed, trying fallback...")
@@ -81,6 +87,22 @@ def generate_caption(title, prices, deal_url):
     prompt = f"Write a short catchy caption for this product deal:\nTitle: {title}\nPrices:\n{prices}"
     response = model.generate_content(prompt)
     return response.text.strip() + f"\n\n🛍️ Buy Now: {affiliate}"
+
+
+
+def fetch_reddit_backup():
+    import feedparser
+    url = "https://www.reddit.com/r/deals/.rss"
+    rss = feedparser.parse(url)
+    if not rss.entries:
+        print("❌ Reddit RSS is empty.")
+        return None
+    entry = rss.entries[0]
+    return {
+        "title": entry.title,
+        "link": entry.link
+    }
+
 
 def main():
     deal = fetch_desidime_deal()
