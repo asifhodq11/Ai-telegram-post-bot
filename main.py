@@ -1,5 +1,3 @@
-# main.py — v1.5 secure version with env-based config
-
 import feedparser
 import requests
 from bs4 import BeautifulSoup
@@ -8,20 +6,46 @@ import google.generativeai as genai
 import os
 from datetime import datetime
 from telegram_post import send_telegram_post
+from personal_post import send_personal_alert
 
-def fetch_desidime_deals():
-    rss = feedparser.parse('https://www.desidime.com/deals.rss')
+# ✅ Try RSS First
+def fetch_desidime_rss():
+    url = "https://www.desidime.com/deals.rss"
+    rss = feedparser.parse(url)
     if not rss.entries:
         return None
-    entry = rss.entries[0]
-    return {"title": entry.title, "link": entry.link}
+    first = rss.entries[0]
+    return {"title": first.title, "link": first.link}
+
+# ✅ Fallback Deals Scraper if RSS fails
+def fetch_desidime_html():
+    url = "https://www.desidime.com/deals"
+    response = requests.get(url)
+    if response.status_code != 200:
+        return None
+    soup = BeautifulSoup(response.text, 'html.parser')
+    try:
+        card = soup.select_one(".deal-info")
+        title = card.select_one(".deal-title").get_text(strip=True)
+        link = "https://www.desidime.com" + card.select_one("a")["href"]
+        return {"title": title, "link": link}
+    except Exception as e:
+        print("❌ HTML scrape failed:", e)
+        return None
+
+# ✅ Full Getter with fallback logic
+def fetch_desidime_deal():
+    deal = fetch_desidime_rss()
+    if deal:
+        return deal
+    print("⚠️ RSS failed, trying fallback...")
+    deal = fetch_desidime_html()
+    return deal
 
 def fetch_smartprix_prices():
     url = 'https://www.smartprix.com/laptops'
-    response = requests.get(url)
-    if response.status_code != 200:
-        return "⚠️ Failed to fetch Smartprix data."
-    soup = BeautifulSoup(response.text, 'html.parser')
+    res = requests.get(url)
+    soup = BeautifulSoup(res.text, 'html.parser')
     products = soup.select(".sm-product")
     results = []
     for p in products[:5]:
@@ -33,37 +57,39 @@ def fetch_smartprix_prices():
             results.append(f"🔹 {name} - {price}")
             if len(results) >= 2:
                 break
-    return "\n".join(results) if results else "⚠️ No valid products found."
+    return "\n".join(results) if results else "⚠️ No prices found."
 
-def generate_image(title, smart_prices):
+def generate_image(title, prices):
     img = Image.new("RGB", (800,600), color=(255,255,255))
     draw = ImageDraw.Draw(img)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    font = ImageFont.truetype(font_path, 28)
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
     draw.text((50, 50), title, fill="black", font=font)
-    draw.text((50, 150), smart_prices, fill="blue", font=font)
+    draw.text((50, 150), prices, fill="blue", font=font)
     now = datetime.now().strftime("%Y%m%d-%H%M%S")
     filename = f"deal-{now}.png"
     img.save(filename)
     return filename
 
-def generate_caption(title, prices):
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    genai.configure(api_key=gemini_key)
+def convert_to_earnkaro_link(original_url):
+    user_id = os.environ.get("EARNKARO_ID")
+    return f"https://ekaro.in/en?k={user_id}&url={original_url}" if user_id else original_url
+
+def generate_caption(title, prices, deal_url):
+    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-pro")
-    prompt = f"Write a catchy caption:\nTitle: {title}\nPrices:\n{prices}"
+    affiliate = convert_to_earnkaro_link(deal_url)
+    prompt = f"Write a short catchy caption for this product deal:\nTitle: {title}\nPrices:\n{prices}"
     response = model.generate_content(prompt)
-    return response.text.strip()
+    return response.text.strip() + f"\n\n🛍️ Buy Now: {affiliate}"
 
 def main():
-    deal = fetch_desidime_deals()
+    deal = fetch_desidime_deal()
     if not deal:
-        print("❌ No deals found.")
+        send_personal_alert("❌ No deals found in RSS or HTML today!")
         return
-
-    smart_prices = fetch_smartprix_prices()
-    caption = generate_caption(deal['title'], smart_prices)
-    image_file = generate_image(deal['title'], smart_prices)
+    prices = fetch_smartprix_prices()
+    caption = generate_caption(deal['title'], prices, deal['link'])
+    image_file = generate_image(deal['title'], prices)
 
     with open("caption.txt", "w") as f:
         f.write(caption)
@@ -71,7 +97,7 @@ def main():
     print("✅ Image:", image_file)
     print("📝 Caption:", caption)
 
-    # Auto-Post to Telegram
+    # Auto-post to channel
     send_telegram_post(image_file, caption)
 
 if __name__ == "__main__":
