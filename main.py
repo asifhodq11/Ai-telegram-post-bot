@@ -80,13 +80,6 @@ def convert_to_earnkaro_link(original_url):
     user_id = os.environ.get("EARNKARO_ID")
     return f"https://ekaro.in/en?k={user_id}&url={original_url}" if user_id else original_url
 
-def generate_caption(title, prices, deal_url):
-    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-    model = genai.GenerativeModel("gemini-pro")
-    affiliate = convert_to_earnkaro_link(deal_url)
-    prompt = f"Write a short catchy caption for this product deal:\nTitle: {title}\nPrices:\n{prices}"
-    response = model.generate_content(prompt)
-    return response.text.strip() + f"\n\n🛍️ Buy Now: {affiliate}"
 
 
 
@@ -102,6 +95,39 @@ def fetch_reddit_backup():
         "title": entry.title,
         "link": entry.link
     }
+
+
+def generate_caption(title, prices, deal_url):
+    prompt = f"Write a short and catchy Telegram deal post for:\nTitle: {title}\nPrices:\n{prices}\nLink: {deal_url}"
+
+    # 🔹 Gemini Primary AI
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        model = genai.GenerativeModel("gemini-pro")
+        response = model.generate_content(prompt)
+        return response.text.strip() + f"\n\n🛒 Link: {deal_url}"
+    
+    except Exception as gemini_exc:
+        print("⚠️ Gemini failed:", gemini_exc)
+        print("Trying OpenRouter backup...")
+
+        # 🔹 OpenRouter Fallback
+        try:
+            import openai
+            openai.api_key = os.environ.get("OPENROUTER_API_KEY")
+            openai.api_base = "https://openrouter.ai/api/v1"
+
+            response = openai.ChatCompletion.create(
+                model="claude-3-haiku",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.choices[0].message.content.strip() + f"\n\n🛒 Link: {deal_url}"
+
+        except Exception as openrouter_exc:
+            print("❌ Both AI services failed.")
+            print("Using fallback caption...")
+            return f"🔥 Deal: {title}\n💸 Prices: {prices}\n🛒 Link: {deal_url}"
 
 
 def main():
