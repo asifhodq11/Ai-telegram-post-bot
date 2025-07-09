@@ -102,7 +102,7 @@ def fetch_reddit_backup():
     try:
         import google.generativeai as genai
         genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("models/gemini-1.5-pro")
         response = model.generate_content(prompt)
         return response.text.strip() + f"\n\n🛒 Link: {deal_url}"
     
@@ -145,7 +145,7 @@ def generate_caption(title, prices, deal_url):
             raise ValueError("❌ GEMINI_API_KEY not set.")
 
         genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("models/gemini-1.5-pro")
         response = model.generate_content(prompt)
         return response.text.strip() + f"\n\n🛒 {deal_url}"
 
