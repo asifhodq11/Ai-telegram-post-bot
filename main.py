@@ -9,44 +9,10 @@ from telegram_post import send_telegram_post
 from personal_post import send_personal_alert
 
 # ✅ Try RSS First
-def fetch_desidime_rss():
-    url = "https://www.desidime.com/deals.rss"
-    rss = feedparser.parse(url)
-    if not rss.entries:
-        return None
-    first = rss.entries[0]
-    return {"title": first.title, "link": first.link}
 
 # ✅ Fallback Deals Scraper if RSS fails
-def fetch_desidime_html():
-    url = "https://www.desidime.com/deals"
-    response = requests.get(url)
-    if response.status_code != 200:
-        return None
-    soup = BeautifulSoup(response.text, 'html.parser')
-    try:
-        card = soup.select_one(".deal-info")
-        title = card.select_one(".deal-title").get_text(strip=True)
-        link = "https://www.desidime.com" + card.select_one("a")["href"]
-        return {"title": title, "link": link}
-    except Exception as e:
-        print("❌ HTML scrape failed:", e)
-        return None
 
 # ✅ Full Getter with fallback logic
-def fetch_desidime_deal():
-    deal = fetch_desidime_rss()
-    if not deal:
-        print("⚠️ DesiDime RSS failed. Trying Reddit backup...")
-        deal = fetch_reddit_backup()
-    if not deal:
-        send_personal_alert("❌ No deals from DesiDime or Reddit RSS 😓")
-        return
-    if deal:
-        return deal
-    print("⚠️ RSS failed, trying fallback...")
-    deal = fetch_desidime_html()
-    return deal
 
 def fetch_smartprix_prices():
     url = 'https://www.smartprix.com/laptops'
@@ -83,18 +49,6 @@ def convert_to_earnkaro_link(original_url):
 
 
 
-def fetch_reddit_backup():
-    import feedparser
-    url = "https://www.reddit.com/r/deals/.rss"
-    rss = feedparser.parse(url)
-    if not rss.entries:
-        print("❌ Reddit RSS is empty.")
-        return None
-    entry = rss.entries[0]
-    return {
-        "title": entry.title,
-        "link": entry.link
-    }
 
 
 
@@ -170,8 +124,125 @@ def generate_caption(title, prices, deal_url):
             return f"🔥 Deal: {title}\n💸 Prices: {prices}\n🛒 Link: {deal_url}"
 
 
+
+def fetch_amazon_deal(keyword="smartphone"):
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+        url = f"https://www.amazon.in/s?k={keyword.replace(' ', '+')}"
+        r = requests.get(url, headers=headers)
+
+        if r.status_code != 200:
+            print("❌ Amazon blocked the request (status not 200)")
+            return None
+
+        soup = BeautifulSoup(r.text, 'html.parser')
+        block = soup.select_one(".s-result-item h2 a")
+        if not block:
+            print("❌ No product found in Amazon search DOM")
+            return None
+
+        title = block.text.strip()
+        href = block.get("href")
+        link = "https://www.amazon.in" + href
+        return {
+            "title": title,
+            "link": link
+        }
+    except Exception as e:
+        print("⚠️ Error in fetch_amazon_deal():", e)
+        return None
+
+def fetch_smartprix_top():
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+
+        url = "https://www.smartprix.com/laptops"  # Could alternate to smartphones
+        r = requests.get(url)
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        card = soup.select_one(".sm-product")
+        name = card.select_one(".title").text.strip()
+        price = card.select_one(".price").text.strip()
+        return name + " - " + price
+    except Exception as e:
+        print("⚠️ Smartprix failed:", e)
+        return "⚠️ Price Unavailable"
+
+def fetch_deal(keyword="smartphone"):
+    deal = fetch_amazon_deal(keyword)
+    if deal:
+        return deal
+    print("🔁 Amazon failed. Trying Smartprix...")
+    alt_title = fetch_smartprix_top()
+    return {
+        "title": alt_title,
+        "link": "https://www.smartprix.com/laptops"
+    }
+
+
+
+def fetch_amazon_deal(keyword="smartphone"):
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+        url = f"https://www.amazon.in/s?k={keyword.replace(' ', '+')}"
+        r = requests.get(url, headers=headers)
+
+        if r.status_code != 200:
+            print("❌ Amazon blocked the request")
+            return None
+
+        soup = BeautifulSoup(r.text, 'html.parser')
+        item = soup.select_one(".s-result-item h2 a")
+        if not item:
+            print("❌ No product found on Amazon")
+            return None
+
+        title = item.text.strip()
+        href = item.get('href')
+        link = "https://www.amazon.in" + href
+        return {"title": title, "link": link}
+    except Exception as e:
+        print("⚠️ Amazon fetch error:", e)
+        return None
+
+def fetch_smartprix_top():
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+
+        url = "https://www.smartprix.com/laptops"
+        r = requests.get(url)
+        soup = BeautifulSoup(r.text, "html.parser")
+        prod = soup.select_one(".sm-product .title")
+        price = soup.select_one(".sm-product .price")
+        if prod and price:
+            return prod.get_text(strip=True) + " - " + price.get_text(strip=True)
+    except Exception as e:
+        print("⚠️ Smartprix fetch error:", e)
+    return "⚠️ Price not available"
+
+def fetch_deal(keyword="smartphone"):
+    deal = fetch_amazon_deal(keyword)
+    if deal:
+        return deal
+    print("🔁 Amazon failed – trying Smartprix...")
+    alt = fetch_smartprix_top()
+    return {"title": alt, "link": "https://www.smartprix.com/laptops"}
+
+
 def main():
-    deal = fetch_desidime_deal()
+    deal = fetch_deal()
     if not deal:
         send_personal_alert("❌ No deals found in RSS or HTML today!")
         return
