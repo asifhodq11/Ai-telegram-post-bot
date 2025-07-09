@@ -1,10 +1,11 @@
-# main.py — v1.4 with Telegram Integration
+# main.py — v1.5 secure version with env-based config
 
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 from PIL import Image, ImageDraw, ImageFont
 import google.generativeai as genai
+import os
 from datetime import datetime
 from telegram_post import send_telegram_post
 
@@ -47,9 +48,10 @@ def generate_image(title, smart_prices):
     return filename
 
 def generate_caption(title, prices):
-    genai.configure(api_key="AIzaSyA2Q5P_bdCFVYNdlpZB33dBpLt7eaMIuJo")
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    genai.configure(api_key=gemini_key)
     model = genai.GenerativeModel("gemini-1.5-pro")
-    prompt = f"Write a catchy promo caption:\n\nTitle: {title}\n\nPrices:\n{prices}"
+    prompt = f"Write a catchy caption:\nTitle: {title}\nPrices:\n{prices}"
     response = model.generate_content(prompt)
     return response.text.strip()
 
@@ -58,6 +60,7 @@ def main():
     if not deal:
         print("❌ No deals found.")
         return
+
     smart_prices = fetch_smartprix_prices()
     caption = generate_caption(deal['title'], smart_prices)
     image_file = generate_image(deal['title'], smart_prices)
@@ -68,7 +71,7 @@ def main():
     print("✅ Image:", image_file)
     print("📝 Caption:", caption)
 
-    # ✅ Post to Telegram
+    # Auto-Post to Telegram
     send_telegram_post(image_file, caption)
 
 if __name__ == "__main__":
