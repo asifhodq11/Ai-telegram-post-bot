@@ -97,8 +97,6 @@ def fetch_reddit_backup():
     }
 
 
-def generate_caption(title, prices, deal_url):
-    prompt = f"Write a short and catchy Telegram deal post for:\nTitle: {title}\nPrices:\n{prices}\nLink: {deal_url}"
 
     # 🔹 Gemini Primary AI
     try:
@@ -127,6 +125,48 @@ def generate_caption(title, prices, deal_url):
         except Exception as openrouter_exc:
             print("❌ Both AI services failed.")
             print("Using fallback caption...")
+            return f"🔥 Deal: {title}\n💸 Prices: {prices}\n🛒 Link: {deal_url}"
+
+
+
+def generate_caption(title, prices, deal_url):
+    import os
+    import traceback
+
+    prompt = f"Write a short, catchy caption for an exclusive deal:\n\nTitle: {title}\nPrices:\n{prices}\nLink: {deal_url}"
+
+    # ✅ Try Gemini first
+    try:
+        import google.generativeai as genai
+        from google.api_core.exceptions import GoogleAPICallError, ResourceExhausted
+
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        if not gemini_key:
+            raise ValueError("❌ GEMINI_API_KEY not set.")
+
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel("gemini-pro")
+        response = model.generate_content(prompt)
+        return response.text.strip() + f"\n\n🛒 {deal_url}"
+
+    # Fallback if Gemini fails
+    except (GoogleAPICallError, ResourceExhausted, Exception) as gemini_error:
+        print("⚠️ Gemini failed:", gemini_error)
+        print("➡️ Switching to OpenRouter fallback...")
+
+        try:
+            import openai
+            openai.api_key = os.environ.get("OPENROUTER_API_KEY")
+            openai.api_base = "https://openrouter.ai/api/v1"
+
+            response = openai.ChatCompletion.create(
+                model="claude-3-haiku",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response['choices'][0]['message']['content'].strip() + f"\n\n🛒 {deal_url}"
+
+        except Exception as openrouter_error:
+            print("❌ Fallback OpenRouter also failed:", openrouter_error)
             return f"🔥 Deal: {title}\n💸 Prices: {prices}\n🛒 Link: {deal_url}"
 
 
