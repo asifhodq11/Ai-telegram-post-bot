@@ -104,13 +104,75 @@ def fetch_cuelinks_deal():
 
 
 
-def fetch_deal():
-    deal = fetch_cuelinks_deal()
+
+
+
+
+
+
+def fetch_amazon_deal(keyword="smartphone"):
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+        url = f"https://www.amazon.in/s?k={keyword.replace(' ', '+')}"
+        r = requests.get(url, headers=headers)
+
+        if r.status_code != 200:
+            print("❌ Amazon blocked or failed (", r.status_code, ")")
+            return None
+
+        soup = BeautifulSoup(r.text, "html.parser")
+        block = soup.select_one(".s-result-item h2 a")
+        if not block:
+            print("❌ No visible Amazon result")
+            return None
+
+        title = block.text.strip()
+        href = block.get("href")
+        link = "https://www.amazon.in" + href
+        return {"title": title, "link": link}
+    except Exception as e:
+        print("⚠️ Amazon fetch error:", e)
+        return None
+
+def fetch_flipkart_deal(query="smartphone"):
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        url = f"https://www.flipkart.com/search?q={query.replace(' ', '+')}"
+        res = requests.get(url, headers=headers)
+        if res.status_code != 200:
+            print("❌ Flipkart block:", res.status_code)
+            return None
+        soup = BeautifulSoup(res.text, "html.parser")
+        block = soup.select_one("._1fQZEK")
+        if block:
+            title = block.select_one("._4rR01T").text.strip()
+            link = "https://www.flipkart.com" + block.get("href")
+            return {"title": title, "link": link}
+        print("❌ Flipkart structure not matched")
+        return None
+    except Exception as e:
+        print("⚠️ Flipkart fetch crash:", e)
+        return None
+
+def fetch_deal(keyword="smartphone"):
+    deal = fetch_amazon_deal(keyword)
     if deal:
         return deal
-    else:
-        send_personal_alert("❌ No deals found from Cuelinks.")
-        return None
+    print("🔁 Amazon failed... Checking Flipkart")
+    deal = fetch_flipkart_deal(keyword)
+    if deal:
+        return deal
+    print("❌ No deals found from Amazon or Flipkart")
+    send_personal_alert("❌ Fetch failed from Amazon + Flipkart.")
+    return None
 
 
 def main():
