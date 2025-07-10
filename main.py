@@ -176,7 +176,7 @@ def fetch_deal(keyword="smartphone"):
 
 
 def main():
-    deal = fetch_desidime_deals()
+    deal = fetch_deal()
 
     if not deal:
         print("❌ No deals found.")
