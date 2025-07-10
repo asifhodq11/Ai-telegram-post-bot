@@ -61,7 +61,7 @@ def generate_image(title, smart_prices):
 # ✅ 4. Generate Caption from Gemini Free API
 def generate_caption(title, prices):
     genai.configure(api_key="AIzaSyA2Q5P_bdCFVYNdlpZB33dBpLt7eaMIuJo")
-    model = genai.GenerativeModel("gemini-1.5-pro")
+    model = genai.GenerativeModel("models/gemini-1.5-pro")
 
     prompt = f"Write a short, catchy caption for this product deal post:\nTitle: {title}\n\nPrices:\n{prices}"
     response = model.generate_content(prompt)
