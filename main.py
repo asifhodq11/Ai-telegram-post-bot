@@ -1,174 +1,147 @@
-# main.py — v1.3: Final Patch — Safe f-string rendering inside Colab
-
-import feedparser
+import os
 import requests
 from bs4 import BeautifulSoup
+import feedparser
 from PIL import Image, ImageDraw, ImageFont
-import google.generativeai as genai
-import os
 from datetime import datetime
+import google.generativeai as genai
 
-# ✅ 1. Fetch Deal from DesiDime RSS
-def fetch_desidime_deals():
-    rss = feedparser.parse('https://www.desidime.com/deals.rss')
-    if not rss.entries:
-        return None
-    entry = rss.entries[0]
-    return {
-        "title": entry.title,
-        "link": entry.link
+print("🟢 Running updated main.py — Build v3.2")
+
+def send_personal_alert(message):
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    personal_id = os.environ.get("TELEGRAM_PERSONAL_CHAT_ID")
+    if not bot_token or not personal_id:
+        return
+    payload = {
+        "chat_id": personal_id,
+        "text": message
     }
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    try:
+        requests.post(url, data=payload)
+    except:
+        pass
 
-# ✅ 2. Fetch Comparison Prices from Smartprix (HTML Safe)
-def fetch_smartprix_prices():
-    url = 'https://www.smartprix.com/laptops'
-    response = requests.get(url)
-    if response.status_code != 200:
-        return "⚠️ Failed to fetch Smartprix data."
-
-    soup = BeautifulSoup(response.text, 'html.parser')
-    products = soup.select(".sm-product")
-    results = []
-
-    for p in products[:5]:
-        title_elem = p.select_one(".title")
-        price_elem = p.select_one(".price")
-
-        if title_elem and price_elem:
-            name = title_elem.get_text(strip=True)
-            price = price_elem.get_text(strip=True)
-            results.append(f"🔹 {name} - {price}")
-            if len(results) >= 2:
-                break
-
-    return "\n".join(results) if results else "⚠️ No valid products found."
-
-# ✅ 3. Create Poster Image using PIL
-def generate_image(title, smart_prices):
-    img = Image.new("RGB", (800, 600), color=(255,255,255))
-    draw = ImageDraw.Draw(img)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    font = ImageFont.truetype(font_path, 28)
-
-    draw.text((50, 50), title, fill="black", font=font)
-    draw.text((50, 150), smart_prices, fill="blue", font=font)
-
-    now = datetime.now().strftime("%Y%m%d-%H%M%S")
-    filename = f"deal-{now}.png"
-    img.save(filename)
-    return filename
-
-# ✅ 4. Generate Caption from Gemini Free API
-def generate_caption(title, prices):
-    genai.configure(api_key="AIzaSyA2Q5P_bdCFVYNdlpZB33dBpLt7eaMIuJo")
-    model = genai.GenerativeModel("gemini-1.5-pro")
-
-    prompt = f"Write a short, catchy caption for this product deal post:\nTitle: {title}\n\nPrices:\n{prices}"
-    response = model.generate_content(prompt)
-    return response.text.strip()
-
-# ✅ 5. Run Everything
-
-def fetch_deal(keyword="smartphone"):
-    import requests
-    from bs4 import BeautifulSoup
-    import os
-    import feedparser
-
+def fetch_deal():
     headers = {"User-Agent": "Mozilla/5.0"}
 
-    # ✅ 1. Try Cuelinks (safe, monetized)
+    # ✅ Cuelinks
     try:
-        print("🔍 Trying Cuelinks...")
-        r = requests.get("https://www.cuelinks.com/deal-of-the-day", headers=headers)
+        print("➡️ Trying Cuelinks...")
+        r = requests.get("https://www.cuelinks.com/deal-of-the-day", headers=headers, timeout=10)
         soup = BeautifulSoup(r.text, 'html.parser')
         box = soup.select_one(".deal-box")
         if box:
             title = box.select_one(".deal-title").text.strip()
             merchant = box.select_one(".merchant").text.strip()
-            link = box.select_one("a")["href"]
-            redirect = requests.get(link, headers=headers, allow_redirects=True)
-            actual = redirect.url
+            short_url = box.select_one("a")["href"]
+            resolved = requests.get(short_url, headers=headers, allow_redirects=True)
+            real = resolved.url
             ek_id = os.environ.get("EARNKARO_ID")
-            affiliate_url = f"https://ekaro.in/en?k={ek_id}&url={actual}" if ek_id else actual
-            return {"title": f"{merchant}: {title}", "link": affiliate_url}
+            if ek_id:
+                real = f"https://ekaro.in/en?k={ek_id}&url={real}"
+            return { "title": f"{merchant}: {title}", "link": real }
     except Exception as e:
         print("❌ Cuelinks failed:", e)
 
-    # ✅ 2. Smartprix RSS feed
+    # ✅ Smartprix RSS
     try:
-        print("🌐 Trying Smartprix RSS...")
+        print("➡️ Trying Smartprix RSS...")
         rss = feedparser.parse("https://www.smartprix.com/feeds/deals")
         if rss.entries:
             entry = rss.entries[0]
-            return {"title": entry.title, "link": entry.link}
+            return { "title": entry.title, "link": entry.link }
     except Exception as e:
         print("❌ Smartprix RSS failed:", e)
 
-    # ✅ 3. Smartprix HTML via ScraperAPI (no block)
+    # ✅ ScraperAPI backup
     try:
-        print("🛠 Fallback: Smartprix HTML via ScraperAPI...")
-        api_key = os.environ.get("SCRAPERAPI_KEY")
-        clean_url = "https://www.smartprix.com/deals"
-        proxied = f"http://api.scraperapi.com?api_key={api_key}&url={clean_url}"
-
+        print("➡️ Trying Smartprix HTML via ScraperAPI...")
+        scraper_key = os.environ.get("SCRAPERAPI_KEY")
+        base = "https://www.smartprix.com/deals"
+        proxied = f"http://api.scraperapi.com?api_key={scraper_key}&url={base}"
         r = requests.get(proxied)
         soup = BeautifulSoup(r.text, "html.parser")
-        block = soup.select_one(".sm-product .title")
+        prod = soup.select_one(".sm-product .title")
         price = soup.select_one(".sm-product .price")
-        if block and price:
+        if prod and price:
             return {
-                "title": f"{block.text.strip()} - {price.text.strip()}",
-                "link": clean_url
+                "title": prod.text.strip() + " - " + price.text.strip(),
+                "link": base
             }
     except Exception as e:
-        print("❌ ScraperAPI fallback failed:", e)
+        print("❌ ScraperAPI failed:", e)
 
-    print("🚫 All sources failed.")
+    print("❌ All sources failed.")
+    send_personal_alert("❗ No deals found by the bot.")
     return None
 
-
-
-def send_personal_alert(message):
-    import os
-    import requests
-
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    personal_id = os.environ.get("TELEGRAM_PERSONAL_CHAT_ID")
-
-    if not bot_token or not personal_id:
-        print("⚠️ Telegram personal alert keys are missing.")
-        return
-
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        "chat_id": personal_id,
-        "text": message
-    }
-
+def fetch_smartprix_prices():
     try:
-        response = requests.post(url, data=payload)
-        print("📤 Personal alert sent:", response.status_code)
-    except Exception as e:
-        print("❌ Error sending personal alert:", e)
+        r = requests.get("https://www.smartprix.com/laptops", timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        cards = soup.select(".sm-product")
+        result = []
+        for card in cards[:2]:
+            name = card.select_one(".title").text.strip()
+            price = card.select_one(".price").text.strip()
+            result.append(f"🔹 {name} - {price}")
+        return "\n".join(result)
+    except:
+        return "❌ Price data not fetched"
+
+
+def generate_caption(title, prices, deal_url):
+    try:
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        model = genai.GenerativeModel("models/gemini-1.5-pro")
+        prompt = f"Create a short caption for product: {title}\nPrices:\n{prices}\nLink: {deal_url}"
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except:
+        return f"🔥 {title}\n{prices}\n🛒 {deal_url}"
+
+
+def generate_image(title, prices):
+    img = Image.new("RGB", (800, 600), color="white")
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
+    except:
+        font = ImageFont.load_default()
+    draw.text((50, 50), title, fill="black", font=font)
+    draw.text((50, 150), prices, fill="blue", font=font)
+    fname = f"deal-{datetime.now().strftime('%Y%m%d-%H%M%S')}.png"
+    img.save(fname)
+    return fname
+
+
+def send_telegram_post(image, caption):
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    channel = os.environ.get("TELEGRAM_CHANNEL")
+    url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+    with open(image, "rb") as img:
+        files = {"photo": img}
+        data = {"chat_id": channel, "caption": caption}
+        try:
+            r = requests.post(url, data=data, files=files)
+            print("✅ Telegram:", r.status_code)
+        except:
+            print("❌ Telegram post failed")
 
 
 def main():
-    deal = fetch_desidime_deals()
-
+    print("✅ BOT VERSION: Fetch Engine v3.2 with ScraperAPI + Gemini + Alerts")
+    deal = fetch_deal()
     if not deal:
-        print("❌ No deals found.")
         return
+    prices = fetch_smartprix_prices()
+    link = deal['link']
+    caption = generate_caption(deal['title'], prices, link)
+    image = generate_image(deal['title'], prices)
+    send_telegram_post(image, caption)
 
-    smart_prices = fetch_smartprix_prices()
-    caption = generate_caption(deal['title'], smart_prices)
-    image_file = generate_image(deal['title'], smart_prices)
-
-    with open("caption.txt", "w") as f:
-        f.write(caption)
-
-    print("✅ Image generated:", image_file)
-    print("📝 Caption:\n", caption)
 
 if __name__ == "__main__":
     main()
