@@ -68,6 +68,66 @@ def generate_caption(title, prices):
     return response.text.strip()
 
 # ✅ 5. Run Everything
+
+def fetch_deal(keyword="smartphone"):
+    import requests
+    from bs4 import BeautifulSoup
+    import os
+    import feedparser
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    # ✅ 1. Try Cuelinks (safe, monetized)
+    try:
+        print("🔍 Trying Cuelinks...")
+        r = requests.get("https://www.cuelinks.com/deal-of-the-day", headers=headers)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        box = soup.select_one(".deal-box")
+        if box:
+            title = box.select_one(".deal-title").text.strip()
+            merchant = box.select_one(".merchant").text.strip()
+            link = box.select_one("a")["href"]
+            redirect = requests.get(link, headers=headers, allow_redirects=True)
+            actual = redirect.url
+            ek_id = os.environ.get("EARNKARO_ID")
+            affiliate_url = f"https://ekaro.in/en?k={ek_id}&url={actual}" if ek_id else actual
+            return {"title": f"{merchant}: {title}", "link": affiliate_url}
+    except Exception as e:
+        print("❌ Cuelinks failed:", e)
+
+    # ✅ 2. Smartprix RSS feed
+    try:
+        print("🌐 Trying Smartprix RSS...")
+        rss = feedparser.parse("https://www.smartprix.com/feeds/deals")
+        if rss.entries:
+            entry = rss.entries[0]
+            return {"title": entry.title, "link": entry.link}
+    except Exception as e:
+        print("❌ Smartprix RSS failed:", e)
+
+    # ✅ 3. Smartprix HTML via ScraperAPI (no block)
+    try:
+        print("🛠 Fallback: Smartprix HTML via ScraperAPI...")
+        api_key = os.environ.get("SCRAPERAPI_KEY")
+        clean_url = "https://www.smartprix.com/deals"
+        proxied = f"http://api.scraperapi.com?api_key={api_key}&url={clean_url}"
+
+        r = requests.get(proxied)
+        soup = BeautifulSoup(r.text, "html.parser")
+        block = soup.select_one(".sm-product .title")
+        price = soup.select_one(".sm-product .price")
+        if block and price:
+            return {
+                "title": f"{block.text.strip()} - {price.text.strip()}",
+                "link": clean_url
+            }
+    except Exception as e:
+        print("❌ ScraperAPI fallback failed:", e)
+
+    print("🚫 All sources failed.")
+    return None
+
+
 def main():
     deal = fetch_desidime_deals()
 
