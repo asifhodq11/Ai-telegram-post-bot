@@ -23,8 +23,6 @@ def send_personal_alert(message):
     except:
         pass
 
-def fetch_deal():
-    headers = {"User-Agent": "Mozilla/5.0"}
 
     # ✅ Cuelinks
     try:
@@ -129,6 +127,23 @@ def send_telegram_post(image, caption):
             print("✅ Telegram:", r.status_code)
         except:
             print("❌ Telegram post failed")
+
+
+
+def fetch_deal():
+    print("🧪 TEST MODE → Using DummyJSON for controlled test")
+    try:
+        r = requests.get("https://dummyjson.com/products")
+        product = r.json()["products"][0]
+        title = product["title"]
+        link  = product["images"][0]
+        return {
+            "title": title,
+            "link": link
+        }
+    except Exception as e:
+        print("❌ Dummy fetch error:", e)
+        return None
 
 
 def main():
