@@ -128,6 +128,31 @@ def fetch_deal(keyword="smartphone"):
     return None
 
 
+
+def send_personal_alert(message):
+    import os
+    import requests
+
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    personal_id = os.environ.get("TELEGRAM_PERSONAL_CHAT_ID")
+
+    if not bot_token or not personal_id:
+        print("⚠️ Telegram personal alert keys are missing.")
+        return
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": personal_id,
+        "text": message
+    }
+
+    try:
+        response = requests.post(url, data=payload)
+        print("📤 Personal alert sent:", response.status_code)
+    except Exception as e:
+        print("❌ Error sending personal alert:", e)
+
+
 def main():
     deal = fetch_desidime_deals()
 
