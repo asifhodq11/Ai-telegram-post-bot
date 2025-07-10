@@ -175,6 +175,8 @@ def fetch_deal(keyword="smartphone"):
     return None
 
 
+print("🤖 Bot version: Cuelinks + EarnKaro v1.0")
+
 def main():
     deal = fetch_deal()
 
