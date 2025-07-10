@@ -68,6 +68,51 @@ def generate_caption(title, prices):
     return response.text.strip()
 
 # ✅ 5. Run Everything
+
+def fetch_cuelinks_deal():
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+
+        url = "https://www.cuelinks.com/deal-of-the-day"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers)
+
+        if r.status_code != 200:
+            print("❌ Cuelinks page blocked or dead")
+            return None
+
+        soup = BeautifulSoup(r.text, "html.parser")
+        deal = soup.select_one(".deal-box")
+
+        if not deal:
+            print("❌ No deals found on Cuelinks")
+            return None
+
+        title = deal.select_one(".deal-title").text.strip()
+        merchant = deal.select_one(".merchant").text.strip()
+        link_tag = deal.select_one("a")
+        link = link_tag["href"] if link_tag else None
+
+        return {
+            "title": f"{merchant} - {title}",
+            "link": link
+        }
+    except Exception as e:
+        print("⚠️ Cuelinks fetch error:", str(e))
+        return None
+
+
+
+def fetch_deal():
+    deal = fetch_cuelinks_deal()
+    if deal:
+        return deal
+    else:
+        send_personal_alert("❌ No deals found from Cuelinks.")
+        return None
+
+
 def main():
     deal = fetch_desidime_deals()
 
